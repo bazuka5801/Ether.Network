@@ -281,7 +281,7 @@ namespace Ether.Network.Server
                 writeEventArgs.SetBuffer(messageData.Message, 0, messageData.Message.Length);
                 writeEventArgs.UserToken = messageData.User;
 
-                if (!messageData.User.Socket.SendAsync(writeEventArgs))
+                if (messageData.User.Socket == null || !messageData.User.Socket.SendAsync(writeEventArgs))
                     this.ProcessSend(writeEventArgs);
             }
             else
