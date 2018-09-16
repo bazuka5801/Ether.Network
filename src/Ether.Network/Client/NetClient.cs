@@ -32,6 +32,7 @@ namespace Ether.Network.Client
         private bool _isDisposed;
         private SocketAsyncEventArgs _socketReceiveArgs;
         private SocketAsyncEventArgs _socketSendArgs;
+        private SocketAsyncEventArgs _connectSocket;
 
         /// <summary>
         /// Gets the packet processor.
@@ -75,16 +76,9 @@ namespace Ether.Network.Client
                 throw new InvalidOperationException("Client is already connected to remote.");
 
             this.CheckConfiguration();
-
-            this.Socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            this._socketSendArgs = NetUtils.CreateSocketAsync(this.Socket, this.IO_Completed);
-            this._socketReceiveArgs = NetUtils.CreateSocketAsync(this, this.IO_Completed, this.Configuration.BufferSize);
-
-            SocketAsyncEventArgs connectSocket = NetUtils.CreateSocketAsync(this.Socket, this.IO_Completed);
-            connectSocket.RemoteEndPoint = NetUtils.CreateIpEndPoint(this.Configuration.Host, this.Configuration.Port);
-
-            SocketError errorCode = ConnectSocketToServer(connectSocket);
             
+            SocketError errorCode = ConnectSocketToServer();
+
             if (!IsConnected)
             {
                 if (this.Configuration.RetryMode == NetClientRetryOptions.Limited)
@@ -93,7 +87,7 @@ namespace Ether.Network.Client
                     
                     while (!IsConnected && count < this.Configuration.MaxRetryAttempts)
                     {
-                        errorCode = ConnectSocketToServer(connectSocket);
+                        errorCode = ConnectSocketToServer();
                         count++;
                     }
                 }
@@ -101,7 +95,7 @@ namespace Ether.Network.Client
                 {
                     while (!IsConnected)
                     {
-                        errorCode = ConnectSocketToServer(connectSocket);
+                        errorCode = ConnectSocketToServer();
                     }
                 }
                 
@@ -332,12 +326,27 @@ namespace Ether.Network.Client
         /// </summary>
         /// <param name="connectSocket">The socket to connect</param>
         /// <returns>The socket error</returns>
-        private SocketError ConnectSocketToServer(SocketAsyncEventArgs connectSocket)
+        private SocketError ConnectSocketToServer()
         {
-            if (this.Socket.ConnectAsync(connectSocket))
+            if (this._connectSocket != null)
+            {
+                Socket.CancelConnectAsync(this._connectSocket);
+                Socket.CancelConnectAsync(this._socketSendArgs);
+                Socket.CancelConnectAsync(this._socketReceiveArgs);
+            }
+
+            this.Socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            this._socketSendArgs = NetUtils.CreateSocketAsync(this.Socket, this.IO_Completed);
+            this._socketReceiveArgs = NetUtils.CreateSocketAsync(this, this.IO_Completed, this.Configuration.BufferSize);
+
+            this._connectSocket = NetUtils.CreateSocketAsync(this.Socket, this.IO_Completed);
+            this._connectSocket.RemoteEndPoint = NetUtils.CreateIpEndPoint(this.Configuration.Host, this.Configuration.Port);
+
+
+            if (this.Socket.ConnectAsync(this._connectSocket))
                 this._autoConnectEvent.WaitOne(Configuration.TimeOut);
 
-            return connectSocket.SocketError;
+            return this._connectSocket.SocketError;
         }
     }
 }
