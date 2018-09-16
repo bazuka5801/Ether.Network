@@ -24,10 +24,10 @@ namespace Ether.Network.Client
         private readonly AutoResetEvent _autoSendEvent;
         private readonly BlockingCollection<byte[]> _sendingQueue;
         private readonly BlockingCollection<byte[]> _receivingQueue;
-        private readonly Task _sendingQueueWorker;
-        private readonly Task _receivingQueueWorker;
-        private readonly CancellationTokenSource _cancelTokenSource;
-        private readonly CancellationToken _cancelToken;
+        private CancellationTokenSource _cancelTokenSource;
+        private CancellationToken _cancelToken;
+        private Task _sendingQueueWorker;
+        private Task _receivingQueueWorker;
 
         private bool _isDisposed;
         private SocketAsyncEventArgs _socketReceiveArgs;
@@ -59,11 +59,7 @@ namespace Ether.Network.Client
             this._autoConnectEvent = new AutoResetEvent(false);
             this._autoSendEvent = new AutoResetEvent(false);
             this._sendingQueue = new BlockingCollection<byte[]>();
-            this._receivingQueue = new BlockingCollection<byte[]>();
-            this._cancelTokenSource = new CancellationTokenSource();
-            this._cancelToken = this._cancelTokenSource.Token;
-            this._sendingQueueWorker = new Task(this.ProcessSendingQueue, this._cancelToken);
-            this._receivingQueueWorker = new Task(this.ProcessReceiveQueue, this._cancelToken);
+            this._receivingQueue = new BlockingCollection<byte[]>();       
         }
 
         /// <inheritdoc />
@@ -329,11 +325,11 @@ namespace Ether.Network.Client
         private SocketError ConnectSocketToServer()
         {
             if (this._connectSocket != null)
-            {
                 Socket.CancelConnectAsync(this._connectSocket);
+            if (this._socketSendArgs != null)
                 Socket.CancelConnectAsync(this._socketSendArgs);
+            if (this._socketReceiveArgs != null)
                 Socket.CancelConnectAsync(this._socketReceiveArgs);
-            }
 
             this.Socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             this._socketSendArgs = NetUtils.CreateSocketAsync(this.Socket, this.IO_Completed);
@@ -342,6 +338,22 @@ namespace Ether.Network.Client
             this._connectSocket = NetUtils.CreateSocketAsync(this.Socket, this.IO_Completed);
             this._connectSocket.RemoteEndPoint = NetUtils.CreateIpEndPoint(this.Configuration.Host, this.Configuration.Port);
 
+            if (this._cancelTokenSource != null)
+            {
+                this._cancelTokenSource.Cancel();
+                this._cancelTokenSource.Dispose();
+                this._cancelTokenSource = null;
+            }
+            this._cancelTokenSource = new CancellationTokenSource();            
+            this._cancelToken = this._cancelTokenSource.Token;
+
+            if (this._sendingQueueWorker != null)
+                this._sendingQueueWorker = null;
+            this._sendingQueueWorker = new Task(this.ProcessSendingQueue, this._cancelToken);
+
+            if (this._receivingQueueWorker != null)
+                this._receivingQueueWorker = null;
+            this._receivingQueueWorker = new Task(this.ProcessReceiveQueue, this._cancelToken);
 
             if (this.Socket.ConnectAsync(this._connectSocket))
                 this._autoConnectEvent.WaitOne(Configuration.TimeOut);
