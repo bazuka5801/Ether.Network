@@ -320,7 +320,6 @@ namespace Ether.Network.Client
         /// <summary>
         /// Connects a socket to a server
         /// </summary>
-        /// <param name="connectSocket">The socket to connect</param>
         /// <returns>The socket error</returns>
         private SocketError ConnectSocketToServer()
         {
