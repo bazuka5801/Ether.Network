@@ -132,7 +132,7 @@ namespace Ether.Network.Client
             this._socketReceiveArgs = null;
 
             this.IsRunning = false;
-            this._cancelTokenSource.Cancel(false);
+            this._cancelTokenSource?.Cancel(false);
             this.OnDisconnected();
         }
 
